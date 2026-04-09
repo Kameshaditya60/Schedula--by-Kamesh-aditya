@@ -3,8 +3,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-
-
+import { UserModule } from './user/user.module';
+import { AuthModule } from './auth/auth.module';
 @Module({
   imports: [
      ConfigModule.forRoot({
@@ -19,10 +19,14 @@ import { ConfigModule } from '@nestjs/config';
       database: process.env.db_name ,
       autoLoadEntities: true,
       synchronize: false,
+      migrationsRun: false,
     }),
-   
+    UserModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService
+  ],
+  
 })
 export class AppModule {}
