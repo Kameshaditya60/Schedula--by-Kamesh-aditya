@@ -3,7 +3,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-
+import { UserModule } from './user/user.module';
+import { AuthModule } from './auth/auth.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt/jwt.guard';
+import { RolesGuard } from './auth/roles.guard';
 
 @Module({
   imports: [
@@ -19,10 +23,25 @@ import { ConfigModule } from '@nestjs/config';
       database: process.env.db_name ,
       autoLoadEntities: true,
       synchronize: false,
+      migrationsRun: false,
     }),
-   
+    UserModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService
+    // ,
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: JwtAuthGuard,
+    // },
+
+    //   {
+    //   provide: APP_GUARD,
+    //   useClass: RolesGuard,
+    // },
+
+  ],
+  
 })
 export class AppModule {}
