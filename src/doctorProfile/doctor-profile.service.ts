@@ -35,14 +35,12 @@ export class DoctorProfileService {
             .createQueryBuilder('doctor')
             .leftJoinAndSelect('doctor.user', 'user');
 
-        // 🔍 FILTER: specialization
         if (filters.specialization) {
             query.andWhere('doctor.specialization ILIKE :spec', {
                 spec: `%${filters.specialization}%`,
             });
         }
 
-        // 🔍 SEARCH: doctor name
         if (filters.search) {
             query.andWhere('user.name ILIKE :name', {
                 name: `%${filters.search}%`,
@@ -51,7 +49,6 @@ export class DoctorProfileService {
 
         const doctors = await query.getMany();
 
-        // ❗ Graceful empty result
         if (doctors.length === 0) {
             return {
                 success: true,
