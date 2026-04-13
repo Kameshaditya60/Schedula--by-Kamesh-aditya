@@ -21,8 +21,8 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate src/migrations/PatientProfile -d data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d data-source.ts",
-    "migration:run_prod": "typeorm-ts-node-commonjs migration:run -d dist/data-source.ts",
-    "migration:revert_prod": "typeorm-ts-node-commonjs migration:revert -d dist/data-source.ts"
+    "migration:run_prod": "typeorm-ts-node-commonjs migration:run -d dist/data-source.js",
+    "migration:revert_prod": "typeorm-ts-node-commonjs migration:revert -d dist/data-source.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
