@@ -18,10 +18,7 @@ import { PatientProfileModule } from './patientProfile/patient-profile.module';
       ssl: {
         rejectUnauthorized: false,
       },
-      // // port: 5433,
-      username: process.env.db_username,
-      password: process.env.db_password,
-      database: process.env.db_name,
+      
       autoLoadEntities: true,
       synchronize: false,
       migrationsRun: false,
