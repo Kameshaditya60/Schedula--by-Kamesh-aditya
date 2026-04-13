@@ -5,28 +5,32 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
+import { DoctorProfileModule } from './doctorProfile/doctor-profile.module';
+import { PatientProfileModule } from './patientProfile/patient-profile.module';
 @Module({
   imports: [
-     ConfigModule.forRoot({
+    ConfigModule.forRoot({
       isGlobal: true,
     }),
-      TypeOrmModule.forRoot({
+    TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.db_host || 'localhost',
-      port: 5433,
-      username: process.env.db_username,
-      password: process.env.db_password ,
-      database: process.env.db_name ,
+      url: process.env.db_url || 'localhost',
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      
       autoLoadEntities: true,
       synchronize: false,
       migrationsRun: false,
     }),
     UserModule,
+    DoctorProfileModule,
+    PatientProfileModule,
     AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService
   ],
-  
+
 })
-export class AppModule {}
+export class AppModule { }
