@@ -24,7 +24,6 @@ export default new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
-    database: process.env.db_name,
     entities: [User, Otp, DoctorProfile, PatientProfile],
     migrations: ['src/migrations/*.ts'],
     synchronize: false,
