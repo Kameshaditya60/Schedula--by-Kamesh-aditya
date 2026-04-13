@@ -6,13 +6,26 @@ import * as dotenv from 'dotenv';
 import { PatientProfile } from './src/patientProfile/patient-profile.entity';
 dotenv.config();
 
+// export default new DataSource({
+//     type: 'postgres',
+//     host: process.env.db_host || 'localhost',
+//     port: 5433,
+//     username: process.env.db_username,
+//     password: process.env.db_password,
+//     database: process.env.db_name,
+//     entities: [User, Otp, DoctorProfile, PatientProfile],
+//     migrations: ['src/migrations/*.ts'],
+// });
+
 export default new DataSource({
     type: 'postgres',
-    host: process.env.db_host || 'localhost',
-    port: 5433,
-    username: process.env.db_username,
-    password: process.env.db_password,
+    url: process.env.db_url,
+
+  ssl: {
+    rejectUnauthorized: false,
+  },
     database: process.env.db_name,
     entities: [User, Otp, DoctorProfile, PatientProfile],
     migrations: ['src/migrations/*.ts'],
+    synchronize: false,
 });
