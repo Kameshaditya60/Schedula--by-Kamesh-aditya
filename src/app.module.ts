@@ -14,7 +14,7 @@ import { PatientProfileModule } from './patientProfile/patient-profile.module';
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.db_url || 'localhost',
+      url: process.env.db_url || 'localhost',
       ssl: {
         rejectUnauthorized: false,
       },
