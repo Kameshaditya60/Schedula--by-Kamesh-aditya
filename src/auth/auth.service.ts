@@ -28,7 +28,10 @@ export class AuthService {
 
         console.log('OTP sent:', otp);
 
-        return { message: 'OTP sent successfully' };
+        return {
+            message: 'OTP sent successfully',
+            otp: otp
+        };
     }
 
     async verifyOtp(dto: VerifyOtpDto) {

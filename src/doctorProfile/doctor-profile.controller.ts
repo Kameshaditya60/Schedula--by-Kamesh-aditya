@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { DoctorProfileService } from './doctor-profile.service';
 import { CreateDoctorProfileDto } from './dto/doctor-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt.guard';
@@ -13,12 +13,22 @@ export class DoctorController {
     @Roles(Role.DOCTOR)
     @Post('onboarding')
     async onboard(@Request() req, @Body() dto: CreateDoctorProfileDto) {
- 
+
         return this.doctorService.createOrUpdateDoctorProfile(req.user.user_id, dto);
     }
 
     @Get()
-    async getAllDoctors() {
-        return this.doctorService.findAll();
+    async getAllDoctors(
+        @Query('specialization') specialization?: string,
+        @Query('search') search?: string,
+    ) {
+        if (specialization && specialization.length < 2) {
+            throw new BadRequestException('Specialization value too short');
+        }
+
+        if (search && search.length < 2) {
+            throw new BadRequestException('Search must be at least 2 characters');
+        }
+        return this.doctorService.findAll({ specialization, search });
     }
 }

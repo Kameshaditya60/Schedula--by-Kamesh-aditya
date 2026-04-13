@@ -29,13 +29,39 @@ export class DoctorProfileService {
 
     }
 
-    async findAll() {
-        let doctors = await this.repo.find({
-            relations: ['user'],
-        });
-        console.log('Found doctors:', doctors);
-        return doctors;
 
+    async findAll(filters: { specialization?: string; search?: string }) {
+        const query = this.repo
+            .createQueryBuilder('doctor')
+            .leftJoinAndSelect('doctor.user', 'user');
+
+        if (filters.specialization) {
+            query.andWhere('doctor.specialization ILIKE :spec', {
+                spec: `%${filters.specialization}%`,
+            });
+        }
+
+        if (filters.search) {
+            query.andWhere('user.name ILIKE :name', {
+                name: `%${filters.search}%`,
+            });
+        }
+
+        const doctors = await query.getMany();
+
+        if (doctors.length === 0) {
+            return {
+                success: true,
+                message: 'No doctors found',
+                data: [],
+            };
+        }
+        console.log('Found doctors:', doctors);
+        return {
+            success: true,
+            count: doctors.length,
+            data: doctors,
+        };
     }
 
 

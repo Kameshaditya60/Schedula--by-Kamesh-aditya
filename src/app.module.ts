@@ -14,11 +14,11 @@ import { PatientProfileModule } from './patientProfile/patient-profile.module';
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.db_host || 'localhost',
-      port: 5433,
-      username: process.env.db_username,
-      password: process.env.db_password,
-      database: process.env.db_name,
+      url: process.env.db_url || 'localhost',
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      
       autoLoadEntities: true,
       synchronize: false,
       migrationsRun: false,
