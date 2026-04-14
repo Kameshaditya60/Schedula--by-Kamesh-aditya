@@ -7,6 +7,7 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { DoctorProfileModule } from './doctorProfile/doctor-profile.module';
 import { PatientProfileModule } from './patientProfile/patient-profile.module';
+import { RecurringAvailabilityModule } from './availability/recurrung-availability.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -14,10 +15,15 @@ import { PatientProfileModule } from './patientProfile/patient-profile.module';
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.db_url || 'localhost',
-      ssl: {
-        rejectUnauthorized: false,
-      },
+      // url: process.env.db_url || 'localhost',
+      // ssl: {
+      //   rejectUnauthorized: false,
+      // },
+       host: process.env.db_host || 'localhost',
+    port: 5433,
+    username: process.env.db_username,
+    password: process.env.db_password,
+    database: process.env.db_name,
       
       autoLoadEntities: true,
       synchronize: false,
@@ -26,6 +32,7 @@ import { PatientProfileModule } from './patientProfile/patient-profile.module';
     UserModule,
     DoctorProfileModule,
     PatientProfileModule,
+    RecurringAvailabilityModule,
     AuthModule,
   ],
   controllers: [AppController],
