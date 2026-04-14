@@ -5,28 +5,29 @@ import { DoctorProfile } from './src/doctorProfile/doctor-profile.entity';
 import * as dotenv from 'dotenv';
 import { PatientProfile } from './src/patientProfile/patient-profile.entity';
 import { RecurringAvailability } from './src/availability/recurring-availability.entity';
+import { AvailabilityOverride } from './src/availability/availability-override.entity';
 dotenv.config();
-
-export default new DataSource({
-    type: 'postgres',
-    host: process.env.db_host || 'localhost',
-    port: 5433,
-    username: process.env.db_username,
-    password: process.env.db_password,
-    database: process.env.db_name,
-    entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability],
-    migrations: ['src/migrations/*.ts'],
-});
 
 // export default new DataSource({
 //     type: 'postgres',
-//     url: process.env.db_url,
-
-//   ssl: {
-//     rejectUnauthorized: false,
-//   },
-  
-//     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability],
+//     host: process.env.db_host || 'localhost',
+//     port: 5433,
+//     username: process.env.db_username,
+//     password: process.env.db_password,
+//     database: process.env.db_name,
+//     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride],
 //     migrations: ['src/migrations/*.ts'],
-//     synchronize: false,
 // });
+
+export default new DataSource({
+    type: 'postgres',
+    url: process.env.db_url,
+
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  
+    entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride],
+    migrations: ['src/migrations/*.ts'],
+    synchronize: false,
+});
