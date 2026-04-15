@@ -1,3 +1,5 @@
 # Schedula
 a Appointment Management System
-cd
+
+Deployed On Render
+Live URL - https://schedula-by-kamesh-aditya.onrender.com
