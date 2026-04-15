@@ -56,6 +56,7 @@ export class RecurringAvailabilityService {
                 end_time: dto.end_time,
                 max_appointments: dto.max_appointments,
                 session_type: dto.session_type,
+                slot_duration: dto.slot_duration,
             });
 
             const saved = await this.repo.save(slot);
@@ -170,6 +171,8 @@ export class RecurringAvailabilityService {
             date: dto.date,
             start_time: dto.start_time || null,
             end_time: dto.end_time || null,
+            slot_duration: dto.slot_duration || null,
+            session_type: dto.session_type || null,
             is_unavailable: dto.is_unavailable,
         });
 

@@ -9,6 +9,8 @@ import {
   IsUUID,
   IsNumber,
   Min,
+  IsPositive,
+  IsInt,
 } from 'class-validator';
 import { SessionType } from '../enums/session-type.enum';
 import { AvailabilityType } from '../enums/availablity-type.enum';
@@ -45,6 +47,10 @@ export class CreateOverrideDto {
     message: `session_type must be one of: ${Object.values(SessionType).join(', ')}`,
   })
   session_type?: SessionType;
+
+  @IsInt({ message: 'Slot duration must be an integer' })
+  @IsPositive({ message: 'Slot duration must be positive' })
+  slot_duration?: number;
 
   @IsEnum(AvailabilityType, {
     message: `availability_type must be one of: ${Object.values(AvailabilityType).join(', ')}`,

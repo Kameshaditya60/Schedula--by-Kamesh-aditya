@@ -48,12 +48,15 @@ export class RecurringAvailability {
   })
   session_type: SessionType;
 
+  @Column({type: 'integer'})
+  slot_duration: number;
+
   @Column({
     type: 'enum',
     enum: AvailabilityType,
     default: 'RECURRING',
   })
-  availability_type: string;
+  availability_type: AvailabilityType;
 
   @Column({
     type: 'boolean',

@@ -6,6 +6,7 @@ import * as dotenv from 'dotenv';
 import { PatientProfile } from './src/patientProfile/patient-profile.entity';
 import { RecurringAvailability } from './src/availability/entity/recurring-availability.entity';
 import { AvailabilityOverride } from './src/availability/entity/availability-override.entity';
+import { Booking } from './src/booking/booking.entity';
 dotenv.config();
 
 // export default new DataSource({
@@ -15,7 +16,7 @@ dotenv.config();
 //     username: process.env.db_username,
 //     password: process.env.db_password,
 //     database: process.env.db_name,
-//     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride],
+//     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride, Booking],
 //     migrations: ['src/migrations/*.ts'],
 // });
 
@@ -23,11 +24,11 @@ export default new DataSource({
     type: 'postgres',
     url: process.env.db_url,
 
-    ssl: {
-        rejectUnauthorized: false,
-    },
-
-    entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride],
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  
+    entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride, Booking],
     migrations: ['src/migrations/*.ts'],
     synchronize: false,
 });
