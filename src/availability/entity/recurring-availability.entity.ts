@@ -8,10 +8,10 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-import { DayOfWeek } from './enums/day-of-week.enum';
-import { SessionType } from './enums/session-type.enum';
-import { DoctorProfile } from '../doctorProfile/doctor-profile.entity';
-import { AvailabilityType } from './enums/availablity-type.enum';
+import { DayOfWeek } from '../enums/day-of-week.enum';
+import { SessionType } from '../enums/session-type.enum';
+import { DoctorProfile } from '../../doctorProfile/doctor-profile.entity';
+import { AvailabilityType } from '../enums/availablity-type.enum';
 
 @Entity('recurring_availability')
 @Index(['doctor_id', 'day_of_week'], { unique: false })

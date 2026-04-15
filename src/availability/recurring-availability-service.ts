@@ -1,9 +1,9 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { RecurringAvailability } from './recurring-availability.entity';
+import { RecurringAvailability } from './entity/recurring-availability.entity';
 import { CreateRecurringAvailabilityDto } from './dto/recurring-availability.dto';
-import { AvailabilityOverride } from './availability-override.entity';
+import { AvailabilityOverride } from './entity/availability-override.entity';
 import { DayOfWeek } from './enums/day-of-week.enum';
 import { CreateOverrideDto } from './dto/availability-override.dto';
 
