@@ -9,26 +9,26 @@ import { AvailabilityOverride } from './src/availability/entity/availability-ove
 import { Booking } from './src/booking/booking.entity';
 dotenv.config();
 
-// export default new DataSource({
-//     type: 'postgres',
-//     host: process.env.db_host || 'localhost',
-//     port: 5433,
-//     username: process.env.db_username,
-//     password: process.env.db_password,
-//     database: process.env.db_name,
-//     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride, Booking],
-//     migrations: ['src/migrations/*.ts'],
-// });
-
 export default new DataSource({
     type: 'postgres',
-    url: process.env.db_url,
-
-  ssl: {
-    rejectUnauthorized: false,
-  },
-  
+    host: process.env.db_host || 'localhost',
+    port: 5433,
+    username: process.env.db_username,
+    password: process.env.db_password,
+    database: process.env.db_name,
     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride, Booking],
     migrations: ['src/migrations/*.ts'],
-    synchronize: false,
 });
+
+// export default new DataSource({
+//     type: 'postgres',
+//     url: process.env.db_url,
+
+//   ssl: {
+//     rejectUnauthorized: false,
+//   },
+  
+//     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride, Booking],
+//     migrations: ['src/migrations/*.ts'],
+//     synchronize: false,
+// });

@@ -1,7 +1,5 @@
 
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-// import { BookingRepository } from '../bookings/booking.repository';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { AvailabilityOverride } from 'src/availability/entity/availability-override.entity';
 import { RecurringAvailability } from 'src/availability/entity/recurring-availability.entity';
 import { generateTimeSlots } from './slot.utils';
@@ -19,18 +17,24 @@ export class SlotService {
     private readonly overrideRepo: Repository<AvailabilityOverride>,
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
-    // private bookingRepo: BookingRepository, // if booking exists
+    
   ) { }
 
   async getSlotsForDate(doctorId: string, date: string) {
-
-    // 1️⃣ Check for override first
+    if (!doctorId || !date) {
+      throw new BadRequestException('doctor_id and date query parameters are required');
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    if (date < today) {
+      throw new BadRequestException('Cannot book slots for past dates');
+    }
+    
     const override = await this.overrideRepo.findOne({
       where: { doctor_id: doctorId, date },
     });
 
     if (override) {
-      if (override.is_unavailable) return []; // full day blocked
+      if (override.is_unavailable) return []; 
 
       return this.buildSlotsFromAvailability(
         override.start_time,
@@ -41,7 +45,6 @@ export class SlotService {
       );
     }
 
-    // 2️⃣ Fallback: recurring availability
 
     const dayName = this.getDayOfWeek(date);
 
@@ -60,6 +63,7 @@ export class SlotService {
         doctorId,
         date,
         item.slot_duration,
+        item.max_appts_per_slot,
       );
 
       finalSlots.push(...slots);
@@ -74,36 +78,32 @@ export class SlotService {
     doctorId: string,
     date: string,
     interval: number,
+    maxAppts?: number,
   ) {
-    // 1️⃣ generate raw slots
+   
     let slots = generateTimeSlots(start, end, interval);
 
-    // 2️⃣ remove slots that are already booked
+   
     const booked = await this.bookingRepo.find({
       where: { doctor_id: doctorId, date },
     });
 
-    console.log('Booked slots for doctor', doctorId, 'on date', date, ':', booked);
+    const bookingCountMap = new Map<string, number>();
 
-    // const bookedKeys = new Set(
-    //   booked.map((b) => `${b.start_time}-${b.end_time}`),
-    // );
-    const bookedKeys = new Set(
     booked
-    .filter((b) => b.status === 'BOOKED')
-    .map((b) => 
-        `${b.start_time.slice(0, 5)}-${b.end_time.slice(0, 5)}`
-    )
-);
-    console.log('Booked keys:', bookedKeys);
+      .filter((b) => b.status === 'BOOKED')
+      .forEach((b) => {
+        const key = `${b.start_time.slice(0, 5)}-${b.end_time.slice(0, 5)}`;
+        bookingCountMap.set(key, (bookingCountMap.get(key) || 0) + 1);
+      });
 
-    slots = slots.filter(
-      (slot) => !bookedKeys.has(`${slot.start}-${slot.end}`),
-    );
-    console.log('Filtered slots:', slots);
+    slots = slots.filter((slot) => {
+      const key = `${slot.start}-${slot.end}`;
+      const count = bookingCountMap.get(key) || 0;
+      return count < maxAppts;
+    });
 
-
-    // 3️⃣ remove past slots if date = today
+ 
     const today = new Date();
     const isToday =
       today.toISOString().slice(0, 10) === date;
@@ -117,18 +117,6 @@ export class SlotService {
     return slots;
   }
 
-  //   private mapDay(i: number) {
-  //     const map = [
-  //       'SUNDAY',
-  //       'MONDAY',
-  //       'TUESDAY',
-  //       'WEDNESDAY',
-  //       'THURSDAY',
-  //       'FRIDAY',
-  //       'SATURDAY',
-  //     ];
-  //     return map[i];
-  //   }
   private getDayOfWeek(date: string): DayOfWeek {
     const days = [
       DayOfWeek.SUNDAY,

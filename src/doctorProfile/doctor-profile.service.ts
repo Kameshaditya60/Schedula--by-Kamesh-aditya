@@ -15,7 +15,6 @@ export class DoctorProfileService {
         let profile = await this.repo.findOne({
             where: { doctor_id: user_id },
         });
-        console.log('Existing profile:', profile);
         if (!profile) {
             profile = this.repo.create({
                 doctor_id: user_id,

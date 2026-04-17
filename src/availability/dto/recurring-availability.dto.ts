@@ -2,6 +2,7 @@
 import { IsEnum, IsString, IsInt, IsPositive, IsArray, ArrayNotEmpty, ArrayUnique } from 'class-validator';
 import { DayOfWeek } from '../enums/day-of-week.enum';
 import { SessionType } from '../enums/session-type.enum';
+import { ScheduleType } from '../enums/schedule-type.enum';
 
 export class CreateRecurringAvailabilityDto {
   @IsArray()
@@ -18,7 +19,11 @@ export class CreateRecurringAvailabilityDto {
 
   @IsInt({ message: 'Max appointments must be an integer' })
   @IsPositive({ message: 'Max appointments must be positive' })
-  max_appointments: number;
+  max_appts_per_slot?: number;
+
+  @IsEnum(ScheduleType, { message: 'Invalid schedule type' })
+  schedule_type: ScheduleType;
+
 
   @IsEnum(SessionType, { message: 'Invalid session type' })
   session_type: SessionType;
