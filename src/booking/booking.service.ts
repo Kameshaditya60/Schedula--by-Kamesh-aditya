@@ -41,9 +41,40 @@ export class BookingService {
       (s) => s.start === start_time && s.end === end_time,
     );
 
-    if (!isValidSlot) {
-      throw new BadRequestException('Slot is not available, try another slot time');
+    if (!isValidSlot && slots.length > 0) {
+      console.log("Slot full. Searching next active day...");
+      throw new BadRequestException('Selected slot is not available');
+
     }
+
+    if (slots.length === 0) {
+       // STEP 2: find next available day
+      const next = await this.slotService.findNextAvailableDay(dto.doctor_id, dto.date);
+
+      if (!next) {
+        throw new BadRequestException('No upcoming availability found.');
+      }
+
+      const autoSlot = next.slots[0]; // choose first slot
+
+    
+      // STEP 3: auto-book
+      const booking = this.repo.create({
+        doctor_id: dto.doctor_id,
+        patient_id: patientId,
+        date: next.date,
+        start_time: autoSlot.start,
+        end_time: autoSlot.end,
+      });
+    
+      const result = await this.repo.save(booking);
+    
+      return {
+        message: `Today's slot full. Automatically booked next available day: ${next.date}`,
+        booked_slot: autoSlot,
+        data: result,
+      };
+  }
 
     // 2️⃣ Check OVERRIDE first
     const override = await this.overrideRepo.findOne({

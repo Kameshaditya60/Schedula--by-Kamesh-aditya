@@ -39,7 +39,6 @@ export class SlotService {
     if (override) {
       if (override.is_unavailable) return [];
 
-      console.log('Override found for', doctorId, 'on', date, ':', override);
 
  // 3️⃣ Fetch bookings ONCE
     const bookings = await this.bookingRepo.find({
@@ -100,11 +99,11 @@ export class SlotService {
     let allSlots = [];
 
     for (const item of recurring) {
-      if (override.slot_duration <= 0) {
-        throw new BadRequestException("Invalid slot_duration in override");
+      if (item.slot_duration <= 0) {
+        throw new BadRequestException("Invalid slot_duration in recurring");
       }
 
-      if (override.start_time === override.end_time) {
+      if (item.start_time === item.end_time) {
         throw new BadRequestException("Invalid override time range");
       }
       const slots = await this.buildSlots({
@@ -124,6 +123,8 @@ export class SlotService {
 
     return allSlots;
   }
+
+
   private async buildSlots({
     start,
     end,
@@ -151,11 +152,9 @@ export class SlotService {
 
     let slots = generateTimeSlots(start, end, interval);
 
-    console.log('Generated slots before filtering:', slots);
-    console.log(' scheduleType:', scheduleType, 'maxAppts:', maxAppts, 'bookedSet:', bookedSet, 'bookedCountMap:', bookedCountMap);
     // 🔥 WAVE logic
     if (scheduleType === ScheduleType.WAVE) {
-      console.log('Applying WAVE logic with maxAppts:', maxAppts);
+      
       slots = slots.filter((slot) => {
         const key = `${slot.start}-${slot.end}`;
         const count = bookedCountMap.get(key) || 0;
@@ -167,29 +166,41 @@ export class SlotService {
     // 🔥 STREAM logic
     else {
 
-      console.log('Applying STREAM logic, filtering out booked slots');
       slots = slots.filter(
         (slot) => !bookedSet.has(`${slot.start}-${slot.end}`),
       );
-      console.log('Slots after STREAM filtering:', slots);
     }
 
     // ⏱ Remove past slots (only once)
     const today = new Date();
     const isToday = today.toISOString().slice(0, 10) === date;
 
-    console.log('Is the requested date today?', isToday);
 
     if (isToday) {
       const currentTime = today.toTimeString().slice(0, 5);
       slots = slots.filter((slot) => slot.start > currentTime);
-      console.log('Slots after filtering past times:', slots);
     }
 
-    console.log('Final slots to return:', slots);
     return slots;
   }
 
+  async findNextAvailableDay(doctorId: string, startDate: string, maxDays = 30) {
+  let date = new Date(startDate);
+
+  for (let i = 1; i <= maxDays; i++) {
+    date.setDate(date.getDate() + 1);
+    const nextDateStr = date.toISOString().slice(0, 10);
+
+    // Get slots for that day
+    const slots = await this.getSlotsForDate(doctorId, nextDateStr);
+
+    if (slots.length > 0) {
+      return { date: nextDateStr, slots };
+    }
+  }
+
+  return null;
+}
 
 
   private getDayOfWeek(date: string): DayOfWeek {

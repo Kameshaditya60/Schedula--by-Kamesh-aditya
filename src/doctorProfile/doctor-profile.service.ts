@@ -55,7 +55,6 @@ export class DoctorProfileService {
                 data: [],
             };
         }
-        console.log('Found doctors:', doctors);
         return {
             success: true,
             count: doctors.length,
