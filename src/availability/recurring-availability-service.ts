@@ -182,6 +182,8 @@ export class RecurringAvailabilityService {
             end_time: dto.end_time || null,
             slot_duration: dto.slot_duration || null,
             session_type: dto.session_type || null,
+            schedule_type: dto.schedule_type || null,
+            max_appts_per_slot: dto.max_appts_per_slot || null,
             is_unavailable: dto.is_unavailable,
         });
 

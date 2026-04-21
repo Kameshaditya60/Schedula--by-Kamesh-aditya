@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { SessionType } from '../enums/session-type.enum';
 import { AvailabilityType } from '../enums/availablity-type.enum';
+import { ScheduleType } from '../enums/schedule-type.enum';
 @Entity('availability_override')
 @Index(['doctor_id', 'date'])
 export class AvailabilityOverride {
@@ -21,7 +22,14 @@ export class AvailabilityOverride {
     end_time: string;
 
     @Column('integer', { nullable: true })
-    max_appointments?: number;
+    max_appts_per_slot?: number;
+
+    @Column({
+        type: 'enum',
+        enum: ScheduleType,
+        nullable: true
+    })
+    schedule_type?: ScheduleType;
 
     @Column({
         type: 'enum',
@@ -31,7 +39,7 @@ export class AvailabilityOverride {
     session_type?: SessionType;
 
     @Column({
-        type:'integer',
+        type: 'integer',
         nullable: true,
     })
     slot_duration?: number;
