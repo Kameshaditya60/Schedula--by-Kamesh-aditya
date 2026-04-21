@@ -22,4 +22,8 @@ export class CreateRecurringAvailabilityDto {
 
   @IsEnum(SessionType, { message: 'Invalid session type' })
   session_type: SessionType;
+
+  @IsInt({ message: 'Slot duration must be an integer' })
+  @IsPositive({ message: 'Slot duration must be positive' })
+  slot_duration: number;
 }

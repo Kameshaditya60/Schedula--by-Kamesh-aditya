@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { DoctorProfileModule } from './doctorProfile/doctor-profile.module';
 import { PatientProfileModule } from './patientProfile/patient-profile.module';
 import { RecurringAvailabilityModule } from './availability/recurring-availability.module';
+import { SlotModule } from './slots/slot.module';
+import { BookingModule } from './booking/booking.module';
 
 @Module({
   imports: [
@@ -20,12 +22,12 @@ import { RecurringAvailabilityModule } from './availability/recurring-availabili
       ssl: {
         rejectUnauthorized: false,
       },
-    //    host: process.env.db_host || 'localhost',
-    // port: 5433,
-    // username: process.env.db_username,
-    // password: process.env.db_password,
-    // database: process.env.db_name,
-      
+      // host: process.env.db_host || 'localhost',
+      // port: 5433,
+      // username: process.env.db_username,
+      // password: process.env.db_password,
+      // database: process.env.db_name,
+
       autoLoadEntities: true,
       synchronize: false,
       migrationsRun: false,
@@ -34,6 +36,8 @@ import { RecurringAvailabilityModule } from './availability/recurring-availabili
     DoctorProfileModule,
     PatientProfileModule,
     RecurringAvailabilityModule,
+    SlotModule,
+    BookingModule,
     AuthModule,
   ],
   controllers: [AppController],

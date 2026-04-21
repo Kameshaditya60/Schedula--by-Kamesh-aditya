@@ -26,15 +26,22 @@ export class AvailabilityOverride {
     @Column({
         type: 'enum',
         enum: SessionType,
+        nullable: true,
     })
-    session_type: SessionType;
+    session_type?: SessionType;
+
+    @Column({
+        type:'integer',
+        nullable: true,
+    })
+    slot_duration?: number;
 
     @Column({
         type: 'enum',
         enum: AvailabilityType,
         default: 'CUSTOM',
     })
-    availability_type: string;
+    availability_type: AvailabilityType;
 
 
     @Column({ default: false })
