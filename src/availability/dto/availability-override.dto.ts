@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { SessionType } from '../enums/session-type.enum';
 import { AvailabilityType } from '../enums/availablity-type.enum';
+import { ScheduleType } from '../enums/schedule-type.enum';
 
 export class CreateOverrideDto {
   @IsUUID()
@@ -39,14 +40,17 @@ export class CreateOverrideDto {
   })
   end_time?: string;
 
-  @IsNumber()
-  @Min(0)
-  max_appointments?: number;
+   @IsInt({ message: 'Max appointments per slot must be an integer' })
+  @IsPositive({ message: 'Max appointments per slot must be positive' })
+  max_appts_per_slot?: number;
 
   @IsEnum(SessionType, {
     message: `session_type must be one of: ${Object.values(SessionType).join(', ')}`,
   })
   session_type?: SessionType;
+
+  @IsEnum(ScheduleType, { message: 'Invalid schedule type' })
+  schedule_type?: ScheduleType;
 
   @IsInt({ message: 'Slot duration must be an integer' })
   @IsPositive({ message: 'Slot duration must be positive' })

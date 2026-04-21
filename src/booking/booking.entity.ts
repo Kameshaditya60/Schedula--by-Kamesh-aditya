@@ -7,7 +7,7 @@ import {
 } from 'typeorm';
 
 @Entity('booking')
-@Index(['doctor_id', 'date', 'start_time'], { unique: true }) // 🔥 Prevent double booking at DB level
+@Index(['doctor_id', 'date', 'start_time','patient_id',], { unique: true }) // 🔥 Prevent double booking at DB level
 export class Booking {
   @PrimaryGeneratedColumn('uuid')
   id: string;

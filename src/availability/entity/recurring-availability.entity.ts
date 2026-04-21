@@ -12,6 +12,7 @@ import { DayOfWeek } from '../enums/day-of-week.enum';
 import { SessionType } from '../enums/session-type.enum';
 import { DoctorProfile } from '../../doctorProfile/doctor-profile.entity';
 import { AvailabilityType } from '../enums/availablity-type.enum';
+import { ScheduleType } from '../enums/schedule-type.enum';
 
 @Entity('recurring_availability')
 @Index(['doctor_id', 'day_of_week'], { unique: false })
@@ -39,8 +40,17 @@ export class RecurringAvailability {
   @Column('time')
   end_time: string;
 
-  @Column('integer')
-  max_appointments: number;
+  @Column({
+    type: 'integer',
+    nullable: true,
+  })
+  max_appts_per_slot?: number;
+
+  @Column({
+    type: 'enum',
+    enum: ScheduleType,
+  })
+  schedule_type: ScheduleType;
 
   @Column({
     type: 'enum',

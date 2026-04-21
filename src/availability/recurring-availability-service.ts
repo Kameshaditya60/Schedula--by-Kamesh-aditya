@@ -54,9 +54,10 @@ export class RecurringAvailabilityService {
                 day_of_week: day,
                 start_time: dto.start_time,
                 end_time: dto.end_time,
-                max_appointments: dto.max_appointments,
+                max_appts_per_slot: dto.max_appts_per_slot,
                 session_type: dto.session_type,
                 slot_duration: dto.slot_duration,
+                schedule_type: dto.schedule_type,
             });
 
             const saved = await this.repo.save(slot);
@@ -66,6 +67,14 @@ export class RecurringAvailabilityService {
         return createdSlots;
     }
     async getAvailabilityByDate(doctorId: string, date: string) {
+      if (!doctorId || !date) {
+      throw new BadRequestException('doctorId and date query parameters are required');
+    }
+
+        const today = new Date().toISOString().slice(0, 10);
+        if (date < today) {
+            throw new BadRequestException('Cannot check availability for past dates');
+        }
 
         const overrides = await this.overrideRepo.find({
             where: { doctor_id: doctorId, date },
@@ -173,6 +182,8 @@ export class RecurringAvailabilityService {
             end_time: dto.end_time || null,
             slot_duration: dto.slot_duration || null,
             session_type: dto.session_type || null,
+            schedule_type: dto.schedule_type || null,
+            max_appts_per_slot: dto.max_appts_per_slot || null,
             is_unavailable: dto.is_unavailable,
         });
 
