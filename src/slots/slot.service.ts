@@ -184,7 +184,7 @@ export class SlotService {
     return slots;
   }
 
-  async findNextAvailableDay(doctorId: string, startDate: string, maxDays = 30) {
+  async findNextAvailableDay(doctorId: string, startDate: string, maxDays = 7) {
   let date = new Date(startDate);
 
   for (let i = 1; i <= maxDays; i++) {
@@ -196,7 +196,7 @@ export class SlotService {
 
     if (slots.length > 0) {
       return { date: nextDateStr, slots };
-    }
+    } 
   }
 
   return null;
