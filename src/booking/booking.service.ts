@@ -57,22 +57,12 @@ export class BookingService {
 
         const autoSlot = next.slots[0]; // choose first slot
 
-
-        // STEP 3: auto-book
-        const booking = this.repo.create({
-          doctor_id: dto.doctor_id,
-          patient_id: patientId,
-          date: next.date,
-          start_time: autoSlot.start,
-          end_time: autoSlot.end,
-        });
-
-        const result = await this.repo.save(booking);
+        console.log(`Slot full. Next available slot on ${next.date} at ${autoSlot.start}` + autoSlot );
+      
 
         return {
-          message: `Today's slot full. Automatically booked next available day: ${next.date}`,
-          booked_slot: autoSlot,
-          data: result,
+          message: `No appointments available today. Next available appointment is on ${next.date}`,
+          available_slot: autoSlot
         };
       }
 
