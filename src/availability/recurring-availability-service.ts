@@ -1,20 +1,26 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RecurringAvailability } from './entity/recurring-availability.entity';
 import { CreateRecurringAvailabilityDto } from './dto/recurring-availability.dto';
 import { AvailabilityOverride } from './entity/availability-override.entity';
 import { DayOfWeek } from './enums/day-of-week.enum';
 import { CreateOverrideDto } from './dto/availability-override.dto';
+import { SlotService } from '../slots/slot.service';
+import { Booking } from 'src/booking/booking.entity';
 
 @Injectable()
 export class RecurringAvailabilityService {
     constructor(
+        private slotService: SlotService,
         @InjectRepository(RecurringAvailability)
         private readonly repo: Repository<RecurringAvailability>,
 
         @InjectRepository(AvailabilityOverride)
         private readonly overrideRepo: Repository<AvailabilityOverride>,
+
+        @InjectRepository(Booking)
+        private readonly bookingRepo: Repository<Booking>
     ) { }
 
     async create(dto: CreateRecurringAvailabilityDto, user_id: string) {
@@ -71,8 +77,8 @@ export class RecurringAvailabilityService {
             throw new BadRequestException('doctorId and date query parameters are required');
         }
 
-        const today = new Date().toISOString().slice(0, 10);
-        if (date < today) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (date < todayStr) {
             throw new BadRequestException('Cannot check availability for past dates');
         }
 
@@ -80,12 +86,11 @@ export class RecurringAvailabilityService {
             where: { doctor_id: doctorId, date },
         });
 
-        console.log('Overrides found:', overrides);
         if (overrides.length > 0) {
 
             if (overrides.some(o => o.is_unavailable)) {
                 return {
-                    date,
+                    message: `Doctor is unavailable on ${date}`,
                     available: false,
                     slots: [],
                 };
@@ -94,6 +99,7 @@ export class RecurringAvailabilityService {
             return {
                 date,
                 available: true,
+                message: `Doctor is available on ${date}`,
                 slots: overrides.map(o => ({
                     start_time: o.start_time,
                     end_time: o.end_time,
@@ -103,7 +109,7 @@ export class RecurringAvailabilityService {
 
         const day = this.getDayOfWeek(date);
 
-        const recurring = await this.repo.find({
+        const todaySlots = await this.repo.find({
             where: {
                 doctor_id: doctorId,
                 day_of_week: day,
@@ -111,17 +117,43 @@ export class RecurringAvailabilityService {
             },
             order: { start_time: 'ASC' },
         });
+        if (todaySlots.length > 0) {
+            const tokenCount = await this.bookingRepo.count({
+                where: {
+                    doctor_id: doctorId,
+                    date: date,
+                    status: 'BOOKED',
+                },
+            });
+            return {
+                date,
+                available: true,
+                slots: todaySlots.map(r => ({
+                    start_time: r.start_time,
+                    end_time: r.end_time,
+                })),
+                token_no: tokenCount + 1,
+                message: todaySlots.length > 0 ? `Doctor is available on ${date}` : `Doctor has no availability on ${date}`,
+            };
+        }
 
-        console.log('No override for this date. Returning recurring availability.' + recurring.forEach(r => console.log(`Recurring slot: ${r.start_time} - ${r.end_time}`)) + ` for doctor ${doctorId} on date ${date}`);
+        const next = await this.slotService.suggestNextAvailableDay(doctorId, date);
+
+        if (!next) {
+            return {
+                available: false,
+                message: 'No upcoming availability found.',
+            };
+
+        }
 
         return {
-            date,
-            available: recurring.length > 0,
-            slots: recurring.map(r => ({
-                start_time: r.start_time,
-                end_time: r.end_time,
-            })),
-        };
+            message: `No appointments available on ${date}. Next available appointment is on ${next.date} and Token Number will be ${next.token_no}`,
+            available: true,
+            date: next.date,
+            slots: next.slots,
+            token_no: next.token_no,
+        };  
     }
 
     async createOverride(dto: CreateOverrideDto, user_id: string

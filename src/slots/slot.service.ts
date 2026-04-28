@@ -109,7 +109,7 @@ export class SlotService {
       }
 
       if (item.start_time === item.end_time) {
-        throw new BadRequestException("Invalid override time range");
+        throw new BadRequestException("Invalid time range: start_time and end_time must be different");
       }
       const slots = await this.buildSlots({
         start: item.start_time,
@@ -190,16 +190,18 @@ export class SlotService {
     return slots;
   }
 
-  async suggestNextAvailableDay(doctorId: string, startDate: string, maxDays = 7) {
-    let date = new Date(startDate);
+  async suggestNextAvailableDay(doctorId: string, startDate: string, maxDays = 30) {
+    let baseDate = new Date(startDate);
 
     for (let i = 1; i <= maxDays; i++) {
-      let nextdate = date.setDate(date.getDate() + 1);
-      const nextDateStr = date.toISOString().slice(0, 10);
+      let nextdate = new Date(baseDate);
+      nextdate.setDate(baseDate.getDate() + i);
+      const nextDateStr = nextdate.toISOString().slice(0, 10);
 
       // Get slots for that day
       const slots = await this.getSlotsForDate(doctorId, nextDateStr);
 
+       if (slots.length > 0) {
       const tokenCount = await this.bookingRepo.count({
         where: {
           doctor_id: doctorId,
@@ -208,14 +210,14 @@ export class SlotService {
         },
       });
 
-      const token_no = tokenCount + 1;
-
-      if (slots.length > 0) {
-        return { date: nextDateStr, slots, token_no };
-      }
+      return {
+        date: nextDateStr,
+        slots,
+        token_no: tokenCount + 1,
+      };
     }
-
-    return null;
+    }
+    return{message: "No upcoming Doctor availability in next " + maxDays + " days"}; // No availability in the next maxDays
   }
 
 

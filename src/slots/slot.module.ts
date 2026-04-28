@@ -12,5 +12,6 @@ import { Booking } from 'src/booking/booking.entity';
     ],
     providers: [SlotService],
     controllers: [SlotController],
+    exports: [SlotService],
 })
 export class SlotModule { }

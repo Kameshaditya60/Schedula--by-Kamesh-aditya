@@ -85,8 +85,6 @@ async createBooking(patientId: string, dto: CreateBookingDto) {
     // 5. STREAM → auto assign first available slot + token
     if (scheduleType === ScheduleType.STREAM) {
       
-      // first slot is already the first AVAILABLE one
-      // (getSlotsForDate already filters out booked slots for STREAM)
       const assignedSlot = firstSlot;
 
       // token_no = total BOOKED bookings for this doctor on this date + 1
