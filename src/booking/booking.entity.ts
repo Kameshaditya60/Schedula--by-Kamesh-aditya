@@ -30,6 +30,9 @@ export class Booking {
   @Column({ default: 'BOOKED' })
   status: 'BOOKED' | 'CANCELLED';
 
+  @Column({ nullable: true })
+  token_no: number;
+
   @CreateDateColumn()
   created_at: Date;
 }

@@ -17,10 +17,10 @@ import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles.enum';
 @Controller('booking')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.PATIENT)
 export class BookingController {
   constructor(private service: BookingService) {}
 
+  @Roles(Role.PATIENT)
   @Post()
   createBooking(
     @Body() dto: CreateBookingDto,
@@ -30,6 +30,8 @@ export class BookingController {
     return this.service.createBooking(patientId, dto);
   }
 
+
+  @Roles(Role.PATIENT)
   @Post('cancel/:id')
   cancelBooking(
     @Param('id') id: string,
@@ -39,6 +41,7 @@ export class BookingController {
   }
 
 
+  @Roles(Role.PATIENT)
   @Get('my')
   getMyBookings(
     @Request() req )
@@ -47,6 +50,7 @@ export class BookingController {
   }
 
 
+  @Roles(Role.DOCTOR)
   @Get('doctor')
   getDoctorSchedule(
     @Query('doctor_id') doctorId: string,

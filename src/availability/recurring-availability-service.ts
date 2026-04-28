@@ -67,9 +67,9 @@ export class RecurringAvailabilityService {
         return createdSlots;
     }
     async getAvailabilityByDate(doctorId: string, date: string) {
-      if (!doctorId || !date) {
-      throw new BadRequestException('doctorId and date query parameters are required');
-    }
+        if (!doctorId || !date) {
+            throw new BadRequestException('doctorId and date query parameters are required');
+        }
 
         const today = new Date().toISOString().slice(0, 10);
         if (date < today) {
@@ -80,6 +80,7 @@ export class RecurringAvailabilityService {
             where: { doctor_id: doctorId, date },
         });
 
+        console.log('Overrides found:', overrides);
         if (overrides.length > 0) {
 
             if (overrides.some(o => o.is_unavailable)) {
@@ -111,6 +112,8 @@ export class RecurringAvailabilityService {
             order: { start_time: 'ASC' },
         });
 
+        console.log('No override for this date. Returning recurring availability.' + recurring.forEach(r => console.log(`Recurring slot: ${r.start_time} - ${r.end_time}`)) + ` for doctor ${doctorId} on date ${date}`);
+
         return {
             date,
             available: recurring.length > 0,
@@ -139,42 +142,14 @@ export class RecurringAvailabilityService {
             where: { doctor_id: user_id, date: dto.date },
         });
 
-
-        if (dto.is_unavailable) {
-            const conflict = existing.some(e => e.is_unavailable === true);
-            if (conflict) {
-                throw new BadRequestException(
-                    'Full-day unavailability already exists for this date'
-                );
-            }
+        // If overrides already exist for this date, update them by deleting and recreating
+        if (existing && existing.length > 0) {
+            await this.overrideRepo.delete({
+                doctor_id: user_id,
+                date: dto.date,
+            });
         }
-        if (!dto.is_unavailable) {
-            for (const e of existing) {
-                if (e.is_unavailable) {
 
-                    throw new BadRequestException(
-                        `Cannot create time override because full-day unavailability exists`
-                    );
-                }
-
-                if (!e.start_time || !e.end_time) continue;
-
-                const newStart = dto.start_time;
-                const newEnd = dto.end_time;
-                const existingStart = e.start_time;
-                const existingEnd = e.end_time;
-
-                // Overlap logic
-                const overlaps =
-                    newStart < existingEnd && existingStart < newEnd;
-
-                if (overlaps) {
-                    throw new BadRequestException(
-                        `Time range overlaps with an existing override (${existingStart} - ${existingEnd})`
-                    );
-                }
-            }
-        }
         const override = this.overrideRepo.create({
             doctor_id: user_id,
             date: dto.date,

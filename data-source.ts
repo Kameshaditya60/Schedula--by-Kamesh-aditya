@@ -27,6 +27,12 @@ export default new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
+
+// host: process.env.db_host || 'localhost',
+//       port: 5433,
+//       username: process.env.db_username,
+//       password: process.env.db_password,
+//       database: process.env.db_name,
   
     entities: [User, Otp, DoctorProfile, PatientProfile, RecurringAvailability, AvailabilityOverride, Booking],
     migrations: ['src/migrations/*.ts'],
