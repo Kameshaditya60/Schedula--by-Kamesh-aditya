@@ -31,30 +31,34 @@ export class SlotService {
       throw new BadRequestException('Cannot book past dates');
     }
 
-    // 1️⃣ Override check
+    // 1️⃣ Override check - ensure date is in YYYY-MM-DD format
+    console.log('Searching for override with doctorId:', doctorId, 'date:', date);
+
     const override = await this.overrideRepo.findOne({
       where: { doctor_id: doctorId, date },
     });
 
     if (override) {
+      console.log('Override found , and is_unavailable:', override.is_unavailable);
       if (override.is_unavailable) return [];
+      // Fetch bookings for that date
 
-
- // 3️⃣ Fetch bookings ONCE
-    const bookings = await this.bookingRepo.find({
-      where: { doctor_id: doctorId, date },
-    });
-
-    const bookedCountMap = new Map<string, number>();
-    const bookedSet = new Set<string>();
-
-    bookings
-      .filter((b) => b.status === 'BOOKED')
-      .forEach((b) => {
-        const key = `${b.start_time.slice(0, 5)}-${b.end_time.slice(0, 5)}`;
-        bookedSet.add(key);
-        bookedCountMap.set(key, (bookedCountMap.get(key) || 0) + 1);
+      // 3️⃣ Fetch bookings ONCE
+      const bookings = await this.bookingRepo.find({
+        where: { doctor_id: doctorId, date },
       });
+      console.log('Bookings found:', bookings);
+
+      const bookedCountMap = new Map<string, number>();
+      const bookedSet = new Set<string>();
+
+      bookings
+        .filter((b) => b.status === 'BOOKED')
+        .forEach((b) => {
+          const key = `${b.start_time.slice(0, 5)}-${b.end_time.slice(0, 5)}`;
+          bookedSet.add(key);
+          bookedCountMap.set(key, (bookedCountMap.get(key) || 0) + 1);
+        });
 
 
       return await this.buildSlots({
@@ -76,6 +80,7 @@ export class SlotService {
     const recurring = await this.recurringRepo.find({
       where: { doctor_id: doctorId, day_of_week: dayName },
     });
+    console.log('recurring availability found for day:', dayName, recurring);
 
     if (!recurring.length) return [];
 
@@ -150,11 +155,12 @@ export class SlotService {
 
 
 
+    console.log('interval:', interval);
     let slots = generateTimeSlots(start, end, interval);
 
     // 🔥 WAVE logic
     if (scheduleType === ScheduleType.WAVE) {
-      
+
       slots = slots.filter((slot) => {
         const key = `${slot.start}-${slot.end}`;
         const count = bookedCountMap.get(key) || 0;
@@ -184,23 +190,33 @@ export class SlotService {
     return slots;
   }
 
-  async findNextAvailableDay(doctorId: string, startDate: string, maxDays = 7) {
-  let date = new Date(startDate);
+  async suggestNextAvailableDay(doctorId: string, startDate: string, maxDays = 7) {
+    let date = new Date(startDate);
 
-  for (let i = 1; i <= maxDays; i++) {
-    date.setDate(date.getDate() + 1);
-    const nextDateStr = date.toISOString().slice(0, 10);
+    for (let i = 1; i <= maxDays; i++) {
+      let nextdate = date.setDate(date.getDate() + 1);
+      const nextDateStr = date.toISOString().slice(0, 10);
 
-    // Get slots for that day
-    const slots = await this.getSlotsForDate(doctorId, nextDateStr);
+      // Get slots for that day
+      const slots = await this.getSlotsForDate(doctorId, nextDateStr);
 
-    if (slots.length > 0) {
-      return { date: nextDateStr, slots };
-    } 
+      const tokenCount = await this.bookingRepo.count({
+        where: {
+          doctor_id: doctorId,
+          date: nextDateStr,
+          status: 'BOOKED',
+        },
+      });
+
+      const token_no = tokenCount + 1;
+
+      if (slots.length > 0) {
+        return { date: nextDateStr, slots, token_no };
+      }
+    }
+
+    return null;
   }
-
-  return null;
-}
 
 
   private getDayOfWeek(date: string): DayOfWeek {
