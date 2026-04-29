@@ -86,7 +86,7 @@ export class ClinicHolidayService {
     return this.repo.save(holiday);
   }
 
-  async findAll(): Promise<ClinicHoliday[]> {
+  async findAllClinicHoliday(): Promise<ClinicHoliday[]> {
     return this.repo.find({
       order: { date: 'ASC' },
     });

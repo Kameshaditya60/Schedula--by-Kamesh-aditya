@@ -27,7 +27,7 @@ export class ClinicHolidayController {
 
   @Get()
   findAll() {
-    return this.service.findAll();
+    return this.service.findAllClinicHoliday();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

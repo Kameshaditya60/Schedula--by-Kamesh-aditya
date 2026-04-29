@@ -9,31 +9,38 @@ import { Booking } from 'src/booking/booking.entity';
 import { ScheduleType } from 'src/availability/enums/schedule-type.enum';
 import { ClinicHolidayService } from 'src/clinic-holiday/clinic-holiday.service';
 import { SlotUnavailableReason } from './enums/slot-unavailable-reason.enum';
+
+type SlotTime = { start: string; end: string };
+
+export type SlotsResult = {
+  slots: SlotTime[];
+  reason?: SlotUnavailableReason;
+};
+
 @Injectable()
 export class SlotService {
   constructor(
     @InjectRepository(RecurringAvailability)
-
     private readonly recurringRepo: Repository<RecurringAvailability>,
+
     @InjectRepository(AvailabilityOverride)
     private readonly overrideRepo: Repository<AvailabilityOverride>,
+
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
 
     private readonly clinicHolidayService: ClinicHolidayService,
-
   ) { }
 
-  async getSlotsForDate(doctorId: string, date: string) {
+  async getSlotsForDate(doctorId: string, date: string):
+    Promise<SlotsResult> {
     if (!doctorId || !date) {
       throw new BadRequestException('doctor_id and date are required');
     }
-
     const todayStr = new Date().toISOString().slice(0, 10);
     if (date < todayStr) {
       throw new BadRequestException('Cannot book past dates');
     }
-
 
     const clinicStatus = await this.clinicHolidayService.isHoliday(date);
 
@@ -42,81 +49,103 @@ export class SlotService {
     }
     const clinicClosureWindows = clinicStatus.partialWindows;
 
-    // 1️⃣ Override check - ensure date is in YYYY-MM-DD format
-    console.log('Searching for override with doctorId:', doctorId, 'date:', date);
-
     const override = await this.overrideRepo.findOne({
       where: { doctor_id: doctorId, date },
     });
 
     if (override) {
-      console.log('Override found , and is_unavailable:', override.is_unavailable);
-      if (override.is_unavailable) return [];
-      // Fetch bookings for that date
+      if (override.is_unavailable) {
+        return { slots: [], reason: SlotUnavailableReason.DOCTOR_ON_LEAVE };
+      }
 
-      // 3️⃣ Fetch bookings ONCE
       const bookings = await this.bookingRepo.find({
         where: { doctor_id: doctorId, date },
       });
-      console.log('Bookings found:', bookings);
 
-      const bookedCountMap = new Map<string, number>();
-      const bookedSet = new Set<string>();
+      const { bookedSet, bookedCountMap } = this.buildBookingMaps(bookings);
 
-      bookings
-        .filter((b) => b.status === 'BOOKED')
-        .forEach((b) => {
-          const key = `${b.start_time.slice(0, 5)}-${b.end_time.slice(0, 5)}`;
-          bookedSet.add(key);
-          bookedCountMap.set(key, (bookedCountMap.get(key) || 0) + 1);
-        });
-
-      let slots = await this.buildSlots({
+      const built = this.buildSlots({
         start: override.start_time,
         end: override.end_time,
-        doctorId,
         date,
         interval: override.slot_duration,
-        scheduleType: override.schedule_type, // override usually behaves like stream
+        scheduleType: override.schedule_type,
         maxAppts: override.max_appts_per_slot,
         bookedSet,
         bookedCountMap,
       });
-      slots = this.filterClinicClosureSlots(slots, clinicClosureWindows);
 
-      console.log('Final slots after applying clinic closures:', slots);
+      const finalSlots = this.filterClinicClosureSlots(built.slots, clinicClosureWindows);
 
-      // return await this.buildSlots({
-      //   start: override.start_time,
-      //   end: override.end_time,
-      //   doctorId,
-      //   date,
-      //   interval: override.slot_duration,
-      //   scheduleType: override.schedule_type, // override usually behaves like stream
-      //   maxAppts: override.max_appts_per_slot,
-      //   bookedSet,
-      //   bookedCountMap,
-      // });
-      return slots;
+      if (finalSlots.length === 0) {
+        return { slots: [], reason: built.reason ?? SlotUnavailableReason.ALL_SLOTS_BOOKED };
+      }
+      return { slots: finalSlots };
     }
 
-    // 2️⃣ Get recurring availability
     const dayName = this.getDayOfWeek(date);
-
     const recurring = await this.recurringRepo.find({
       where: { doctor_id: doctorId, day_of_week: dayName },
     });
-    console.log('recurring availability found for day:', dayName, recurring);
 
-    if (!recurring.length) return [];
+    if (!recurring.length) {
+      return { slots: [], reason: SlotUnavailableReason.CLINIC_HOLIDAY };
+    }
 
-    // 3️⃣ Fetch bookings ONCE
     const bookings = await this.bookingRepo.find({
       where: { doctor_id: doctorId, date },
     });
 
-    const bookedCountMap = new Map<string, number>();
+    const { bookedSet, bookedCountMap } = this.buildBookingMaps(bookings);
+
+    let allSlots: SlotTime[] = [];
+    let lastReason: SlotUnavailableReason | undefined;
+    for (const item of recurring) {
+      if (item.slot_duration <= 0) {
+        throw new BadRequestException(`Invalid slot_duration in recurring`);
+      }
+
+      if (item.start_time === item.end_time) {
+        throw new BadRequestException(
+          'Invalid time range: start_time and end_time must be different',
+        );
+      }
+      let built = this.buildSlots({
+        start: item.start_time,
+        end: item.end_time,
+        date,
+        interval: item.slot_duration,
+        scheduleType: item.schedule_type,
+        maxAppts: item.max_appts_per_slot,
+        bookedSet,
+        bookedCountMap,
+      });
+
+      const filtered = this.filterClinicClosureSlots(built.slots, clinicClosureWindows);
+
+      if (filtered.length > 0) {
+        allSlots.push(...filtered);
+      } else {
+        const reason = built.reason ?? SlotUnavailableReason.ALL_SLOTS_BOOKED;
+        // CONSULTING_HOURS_OVER takes priority in the reason reported to the user
+        if (!lastReason || reason === SlotUnavailableReason.CONSULTING_HOURS_OVER) {
+          lastReason = reason;
+        }
+      }
+    }
+
+    if (allSlots.length === 0) {
+      return { slots: [], reason: lastReason ?? SlotUnavailableReason.ALL_SLOTS_BOOKED };
+    }
+
+    return { slots: allSlots };
+  }
+  private buildBookingMaps(bookings: Booking[]): {
+    bookedSet: Set<string>;
+    bookedCountMap: Map<string, number>;
+  } {
     const bookedSet = new Set<string>();
+    const bookedCountMap = new Map<string, number>();
 
     bookings
       .filter((b) => b.status === 'BOOKED')
@@ -126,42 +155,14 @@ export class SlotService {
         bookedCountMap.set(key, (bookedCountMap.get(key) || 0) + 1);
       });
 
-    // 4️⃣ Generate slots
-    let allSlots = [];
-
-    for (const item of recurring) {
-      if (item.slot_duration <= 0) {
-        throw new BadRequestException("Invalid slot_duration in recurring");
-      }
-
-      if (item.start_time === item.end_time) {
-        throw new BadRequestException("Invalid time range: start_time and end_time must be different");
-      }
-      let slots = await this.buildSlots({
-        start: item.start_time,
-        end: item.end_time,
-        doctorId,
-        date,
-        interval: item.slot_duration,
-        scheduleType: item.schedule_type,
-        maxAppts: item.max_appts_per_slot,
-        bookedSet,
-        bookedCountMap,
-      });
-
-      slots = this.filterClinicClosureSlots(slots, clinicClosureWindows);
-
-      allSlots.push(...slots);
-    }
-
-    return allSlots;
+    return { bookedSet, bookedCountMap };
   }
 
 
-  private async buildSlots({
+
+  private buildSlots({
     start,
     end,
-    doctorId,
     date,
     interval,
     scheduleType,
@@ -171,66 +172,66 @@ export class SlotService {
   }: {
     start: string;
     end: string;
-    doctorId: string;
     date: string;
     interval: number;
     scheduleType?: ScheduleType;
     maxAppts?: number;
     bookedSet?: Set<string>;
     bookedCountMap?: Map<string, number>;
-  }) {
+  }): { slots: SlotTime[]; reason?: SlotUnavailableReason } {
+    const rawSlots = generateTimeSlots(start, end, interval);
 
+    let afterBookingFilter: SlotTime[];
 
-
-
-    console.log('interval:', interval);
-    let slots = generateTimeSlots(start, end, interval);
-
-    // 🔥 WAVE logic
     if (scheduleType === ScheduleType.WAVE) {
 
-      slots = slots.filter((slot) => {
+      afterBookingFilter = rawSlots.filter((slot) => {
         const key = `${slot.start}-${slot.end}`;
         const count = bookedCountMap.get(key) || 0;
         return count < (maxAppts ?? 0);
       });
 
-    }
-
-    // 🔥 STREAM logic
-    else {
-
-      slots = slots.filter(
+    } else {
+      afterBookingFilter = rawSlots.filter(
         (slot) => !bookedSet.has(`${slot.start}-${slot.end}`),
       );
     }
 
-    // ⏱ Remove past slots (only once)
     const today = new Date();
     const isToday = today.toISOString().slice(0, 10) === date;
 
+    let finalSlots = afterBookingFilter;
 
     if (isToday) {
       const currentTime = today.toTimeString().slice(0, 5);
-      slots = slots.filter((slot) => slot.start > currentTime);
+      finalSlots = finalSlots.filter((slot) => slot.start > currentTime);
     }
 
-    return slots;
+    if (finalSlots.length === 0) {
+      if (afterBookingFilter.length === 0) {
+        return { slots: [], reason: SlotUnavailableReason.ALL_SLOTS_BOOKED };
+      }
+      // afterBookingFilter had slots but all are in the past
+      return { slots: [], reason: SlotUnavailableReason.CONSULTING_HOURS_OVER };
+
+    }
+    return { slots: finalSlots };
   }
 
-  async suggestNextAvailableDay(doctorId: string, startDate: string, maxDays = 30) {
-    let baseDate = new Date(startDate);
+  async suggestNextAvailableDay(
+    doctorId: string,
+    startDate: string,
+    maxDays = 30,
+  ): Promise<{ date: string; slots: SlotTime[]; token_no: number } | null> {
+    const baseDate = new Date(startDate);
 
     for (let i = 1; i <= maxDays; i++) {
-      let nextdate = new Date(baseDate);
-      nextdate.setDate(baseDate.getDate() + i);
-      const nextDateStr = nextdate.toISOString().slice(0, 10);
+      const nextDate = new Date(baseDate);
+      nextDate.setDate(baseDate.getDate() + i);
+      const nextDateStr = nextDate.toISOString().slice(0, 10);
 
-      // Get slots for that day
-      const slotsResult = await this.getSlotsForDate(doctorId, nextDateStr);
-
-      // Check if slots are available (array) or unavailable (object with reason)
-      if (Array.isArray(slotsResult) && slotsResult.length > 0) {
+      const result = await this.getSlotsForDate(doctorId, nextDateStr);
+      if (result.slots.length > 0) {
         const tokenCount = await this.bookingRepo.count({
           where: {
             doctor_id: doctorId,
@@ -241,13 +242,13 @@ export class SlotService {
 
         return {
           date: nextDateStr,
-          slots: slotsResult,
+          slots: result.slots,
           token_no: tokenCount + 1,
         };
       }
     }
 
-    return { message: `No upcoming Doctor availability in next ${maxDays} days` };
+    return null;
   }
 
 
@@ -262,24 +263,21 @@ export class SlotService {
       DayOfWeek.SATURDAY,
     ];
 
-    const jsDay = new Date(date).getDay(); // 0–6
-    return days[jsDay];
+    return days[new Date(date).getDay()];
   }
 
   private filterClinicClosureSlots(
-    slots: { start: string; end: string }[],
+    slots: SlotTime[],
     closureWindows: { start: string; end: string }[],
-  ): { start: string; end: string }[] {
+  ): SlotTime[] {
     if (!closureWindows || closureWindows.length === 0) return slots;
 
-    return slots.filter((slot) => {
-      // remove slot if it overlaps ANY closure window
-      const overlaps = closureWindows.some(
-        (window) =>
-          slot.start < window.end && slot.end > window.start
-      );
-      return !overlaps;
-    });
+    return slots.filter(
+      (slot) =>
+        !closureWindows.some(
+          (window) => slot.start < window.end && slot.end > window.start,
+        ),
+    );
   }
 
 

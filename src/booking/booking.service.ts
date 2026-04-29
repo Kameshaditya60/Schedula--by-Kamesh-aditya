@@ -15,9 +15,12 @@ import { DayOfWeek } from 'src/availability/enums/day-of-week.enum';
 
 import { AvailabilityOverride } from 'src/availability/entity/availability-override.entity';
 import { ScheduleType } from 'src/availability/enums/schedule-type.enum';
+import { SlotUnavailableReason } from 'src/slots/enums/slot-unavailable-reason.enum';
+import { ClinicHoliday } from 'src/clinic-holiday/entity/clinic-holiday.entity';
 
 @Injectable()
 export class BookingService {
+  
   constructor(
     @InjectRepository(Booking)
     private repo: Repository<Booking>,
@@ -28,197 +31,198 @@ export class BookingService {
     @InjectRepository(AvailabilityOverride)
     private overrideRepo: Repository<AvailabilityOverride>,
 
+    @InjectRepository(ClinicHoliday)
+    private clinicHolidayRepo: Repository<ClinicHoliday>,
+
     private slotService: SlotService,
   ) { }
 
 
-async createBooking(patientId: string, dto: CreateBookingDto) {
-  try {
-    const { doctor_id, date } = dto;
+  async createBooking(patientId: string, dto: CreateBookingDto) {
+    try {
+      const { doctor_id, date } = dto;
 
-
-    // 1. Check duplicate booking for same patient + doctor + date
-    const existingBooking = await this.repo.findOne({
-      where: {
-        doctor_id,
-        patient_id: patientId,
-        date,
-        status: 'BOOKED',
-      },
-    });
-
-    if (existingBooking) {
-      throw new ConflictException(
-        'You already have a booking with this doctor on this date'
-      );
-    }
-
-    // 2. Get available slots for that date
-    const slotsResult = await this.slotService.getSlotsForDate(doctor_id, date);
-
-    // Check if slots are unavailable (object with reason) or available (array)
-    if (!Array.isArray(slotsResult)) {
-      const next = await this.slotService.suggestNextAvailableDay(doctor_id, date);
-
-      if (!next) {
-        throw new BadRequestException('No upcoming availability found.');
-      }
-
-      const ReportingTime = this.subtractMinutes(next.slots[0].start, 15); // 15 minutes before slot start time
-
-      return {
-        message: `No appointments available on ${date}. Next available appointment is on ${next.date} and Token Number will be ${next.token_no}`,
-        available_slot: next.slots[0],
-        token_no: next.token_no,
-        ReportingTime: ReportingTime,
-      };
-    }
-
-    const slots = slotsResult;
-    // 4. Get schedule type
-    const firstSlot = slots[0];
-    const { scheduleType, maxAppts } = await this.getScheduleType(
-      doctor_id,
-      date,
-      firstSlot.start,
-      firstSlot.end,
-    );
-
-    // 5. STREAM → auto assign first available slot + token
-    if (scheduleType === ScheduleType.STREAM) {
-      
-      const assignedSlot = firstSlot;
-
-      // token_no = total BOOKED bookings for this doctor on this date + 1
-      const tokenCount = await this.repo.count({
+      // 1. Check duplicate booking for same patient + doctor + date
+      const existingBooking = await this.repo.findOne({
         where: {
           doctor_id,
+          patient_id: patientId,
           date,
           status: 'BOOKED',
         },
       });
 
-      const token_no = tokenCount + 1;
-
-      const booking = this.repo.create({
-        doctor_id,
-        patient_id: patientId,
-        date,
-        start_time: assignedSlot.start,
-        end_time: assignedSlot.end,
-        token_no,
-      });
-
-      const saved = await this.repo.save(booking);
-
-      return {
-        message: 'Booking created successfully',
-        token_no: saved.token_no,
-        alloted_slot: {
-          start: saved.start_time,
-          end: saved.end_time,
-        },
-        data: saved,
-      };
-    }
-
-    // 6. WAVE → user must provide start_time and end_time
-    if (scheduleType === ScheduleType.WAVE) {
-
-      if (!dto.start_time || !dto.end_time) {
-        throw new BadRequestException(
-          'start_time and end_time are required for WAVE schedule type'
+      if (existingBooking) {
+        throw new ConflictException(
+          'You already have a booking with this doctor on this date'
         );
       }
 
-      const isValidSlot = slots.some(
-        (s) => s.start === dto.start_time && s.end === dto.end_time,
+      // 2. Get available slots for that date
+      const slotsResult = await this.slotService.getSlotsForDate(doctor_id, date);
+
+      if (slotsResult.slots.length === 0) {
+        const next = await this.slotService.suggestNextAvailableDay(doctor_id, date);
+
+        if (!next) {
+          throw new BadRequestException('No upcoming availability found within the next 30 days.');
+        }
+        const message = this.buildUnavailableMessage(slotsResult.reason, date, next.date, next.token_no);
+        const ReportingTime = this.subtractMinutes(next.slots[0].start, 15);
+
+        return {
+          message,
+          available_slot: next.slots[0],
+          token_no: next.token_no,
+          ReportingTime,
+        };
+      }
+
+      const slots = slotsResult.slots;
+      // 4. Get schedule type
+      const firstSlot = slots[0];
+      const { scheduleType, maxAppts } = await this.getScheduleType(
+        doctor_id,
+        date,
+        firstSlot.start,
+        firstSlot.end,
       );
 
-      if (!isValidSlot) {
-        throw new BadRequestException('Selected slot is not available');
+      // 5. STREAM → auto assign first available slot + token
+      if (scheduleType === ScheduleType.STREAM) {
+
+        const assignedSlot = firstSlot;
+
+        // token_no = total BOOKED bookings for this doctor on this date + 1
+        const tokenCount = await this.repo.count({
+          where: {
+            doctor_id,
+            date,
+            status: 'BOOKED',
+          },
+        });
+
+        const token_no = tokenCount + 1;
+
+        const booking = this.repo.create({
+          doctor_id,
+          patient_id: patientId,
+          date,
+          start_time: assignedSlot.start,
+          end_time: assignedSlot.end,
+          token_no,
+        });
+
+        const saved = await this.repo.save(booking);
+
+        return {
+          message: 'Booking created successfully',
+          token_no: saved.token_no,
+          alloted_slot: {
+            start: saved.start_time,
+            end: saved.end_time,
+          },
+          data: saved,
+        };
       }
 
-      const count = await this.repo.count({
-        where: {
+      // 6. WAVE → user must provide start_time and end_time
+      if (scheduleType === ScheduleType.WAVE) {
+
+        if (!dto.start_time || !dto.end_time) {
+          throw new BadRequestException(
+            'start_time and end_time are required for WAVE schedule type'
+          );
+        }
+
+        const isValidSlot = slots.some(
+          (s) => s.start === dto.start_time && s.end === dto.end_time,
+        );
+
+        if (!isValidSlot) {
+          throw new BadRequestException('Selected slot is not available');
+        }
+
+        const count = await this.repo.count({
+          where: {
+            doctor_id,
+            date,
+            start_time: dto.start_time,
+            status: 'BOOKED',
+          },
+        });
+
+        if (count >= maxAppts) {
+          throw new ConflictException('Slot is fully booked');
+        }
+
+        const booking = this.repo.create({
           doctor_id,
+          patient_id: patientId,
           date,
           start_time: dto.start_time,
-          status: 'BOOKED',
-        },
-      });
+          end_time: dto.end_time,
+        });
 
-      if (count >= maxAppts) {
-        throw new ConflictException('Slot is fully booked');
+        const saved = await this.repo.save(booking);
+
+        return {
+          message: 'Booking created successfully',
+          data: saved,
+        };
       }
 
-      const booking = this.repo.create({
-        doctor_id,
-        patient_id: patientId,
-        date,
-        start_time: dto.start_time,
-        end_time: dto.end_time,
-      });
+    } catch (err: any) {
+      const pgCode = err?.code || err?.driverError?.code;
 
-      const saved = await this.repo.save(booking);
+      if (pgCode === '23505') {
+        throw new ConflictException('You have already booked this slot');
+      }
 
+      throw err;
+    }
+  }
+
+  private async getScheduleType(
+    doctor_id: string,
+    date: string,
+    start_time: string,
+    end_time: string,
+  ): Promise<{ scheduleType: ScheduleType; maxAppts?: number }> {
+
+    const override = await this.overrideRepo.findOne({
+      where: { doctor_id, date },
+    });
+
+    if (override && !override.is_unavailable) {
       return {
-        message: 'Booking created successfully',
-        data: saved,
+        scheduleType: override.schedule_type,
+        maxAppts: override.max_appts_per_slot,
       };
     }
 
-  } catch (err: any) {
-    const pgCode = err?.code || err?.driverError?.code;
+    const dayName = new Date(date)
+      .toLocaleString('en-US', { weekday: 'long' })
+      .toUpperCase();
 
-    if (pgCode === '23505') {
-      throw new ConflictException('You have already booked this slot');
+    const availability = await this.availabilityRepo.findOne({
+      where: {
+        doctor_id,
+        day_of_week: DayOfWeek[dayName],
+        start_time: LessThanOrEqual(start_time),
+        end_time: MoreThanOrEqual(end_time),
+      },
+    });
+
+    if (!availability) {
+      throw new BadRequestException('No availability found for this slot');
     }
 
-    throw err;
-  }
-}
-
-private async getScheduleType(
-  doctor_id: string,
-  date: string,
-  start_time: string,
-  end_time: string,
-): Promise<{ scheduleType: ScheduleType; maxAppts?: number }> {
-  
-  const override = await this.overrideRepo.findOne({
-    where: { doctor_id, date },
-  });
-
-  if (override && !override.is_unavailable) {
     return {
-      scheduleType: override.schedule_type,
-      maxAppts: override.max_appts_per_slot,
+      scheduleType: availability.schedule_type,
+      maxAppts: availability.max_appts_per_slot,
     };
   }
-
-  const dayName = new Date(date)
-    .toLocaleString('en-US', { weekday: 'long' })
-    .toUpperCase();
-
-  const availability = await this.availabilityRepo.findOne({
-    where: {
-      doctor_id,
-      day_of_week: DayOfWeek[dayName],
-      start_time: LessThanOrEqual(start_time),
-      end_time: MoreThanOrEqual(end_time),
-    },
-  });
-
-  if (!availability) {
-    throw new BadRequestException('No availability found for this slot');
-  }
-
-  return {
-    scheduleType: availability.schedule_type,
-    maxAppts: availability.max_appts_per_slot,
-  };
-}
 
   // Cancel booking
 
@@ -252,6 +256,30 @@ private async getScheduleType(
       order: { date: 'ASC', start_time: 'ASC' },
     });
   }
+
+  private buildUnavailableMessage(
+    reason: SlotUnavailableReason | undefined,
+    requestedDate: string,
+    nextDate: string,
+    tokenNo: number,
+  ): string {
+    const suffix = `Next available slot is on ${nextDate}. Token number will be ${tokenNo}.`;
+    switch (reason) {
+      case SlotUnavailableReason.ALL_SLOTS_BOOKED:
+        return `Today's appointments are fully booked. ${suffix}`;
+      case SlotUnavailableReason.CONSULTING_HOURS_OVER:
+        return `Consultation hours are over. ${suffix}`;
+      case SlotUnavailableReason.DOCTOR_ON_LEAVE:
+        return `Doctor is unavailable on selected date. ${suffix}`;
+      case SlotUnavailableReason.CLINIC_HOLIDAY:
+        return `Clinic is closed on selected date. ${suffix}`;
+      case SlotUnavailableReason.NO_SCHEDULE:
+        return `Doctor has no schedule on ${requestedDate}. ${suffix}`;
+      default:
+        return `No appointments available on ${requestedDate}. ${suffix}`;
+    }
+  }
+
 
   private subtractMinutes(timeStr: string, minutes: number): string {
     const [hours, mins] = timeStr.split(':').map(Number);
