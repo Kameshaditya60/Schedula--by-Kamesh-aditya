@@ -36,6 +36,7 @@ async createBooking(patientId: string, dto: CreateBookingDto) {
   try {
     const { doctor_id, date } = dto;
 
+
     // 1. Check duplicate booking for same patient + doctor + date
     const existingBooking = await this.repo.findOne({
       where: {
@@ -53,10 +54,10 @@ async createBooking(patientId: string, dto: CreateBookingDto) {
     }
 
     // 2. Get available slots for that date
-    const slots = await this.slotService.getSlotsForDate(doctor_id, date);
+    const slotsResult = await this.slotService.getSlotsForDate(doctor_id, date);
 
-    // 3. No slots at all → suggest next available day
-    if (slots.length === 0) {
+    // Check if slots are unavailable (object with reason) or available (array)
+    if (!Array.isArray(slotsResult)) {
       const next = await this.slotService.suggestNextAvailableDay(doctor_id, date);
 
       if (!next) {
@@ -73,6 +74,7 @@ async createBooking(patientId: string, dto: CreateBookingDto) {
       };
     }
 
+    const slots = slotsResult;
     // 4. Get schedule type
     const firstSlot = slots[0];
     const { scheduleType, maxAppts } = await this.getScheduleType(

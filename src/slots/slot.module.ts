@@ -6,9 +6,12 @@ import { RecurringAvailability } from 'src/availability/entity/recurring-availab
 import { AvailabilityOverride } from 'src/availability/entity/availability-override.entity';
 import { Booking } from 'src/booking/booking.entity';
 
+import { ClinicHolidayModule } from 'src/clinic-holiday/clinic-holiday.module';
+
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RecurringAvailability, AvailabilityOverride, Booking]),
+        TypeOrmModule.forFeature([RecurringAvailability, AvailabilityOverride, Booking,]),
+        ClinicHolidayModule
     ],
     providers: [SlotService],
     controllers: [SlotController],

@@ -1,0 +1,4 @@
+export enum ClinicLeaveType {
+  HOLIDAY = 'HOLIDAY',
+  EMERGENCY_CLOSURE = 'EMERGENCY_CLOSURE',
+}

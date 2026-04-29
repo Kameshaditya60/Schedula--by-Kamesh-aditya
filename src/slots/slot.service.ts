@@ -1,4 +1,3 @@
-
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AvailabilityOverride } from 'src/availability/entity/availability-override.entity';
 import { RecurringAvailability } from 'src/availability/entity/recurring-availability.entity';
@@ -8,6 +7,8 @@ import { Repository } from 'typeorm';
 import { DayOfWeek } from 'src/availability/enums/day-of-week.enum';
 import { Booking } from 'src/booking/booking.entity';
 import { ScheduleType } from 'src/availability/enums/schedule-type.enum';
+import { ClinicHolidayService } from 'src/clinic-holiday/clinic-holiday.service';
+import { SlotUnavailableReason } from './enums/slot-unavailable-reason.enum';
 @Injectable()
 export class SlotService {
   constructor(
@@ -18,6 +19,8 @@ export class SlotService {
     private readonly overrideRepo: Repository<AvailabilityOverride>,
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
+
+    private readonly clinicHolidayService: ClinicHolidayService,
 
   ) { }
 
@@ -30,6 +33,14 @@ export class SlotService {
     if (date < todayStr) {
       throw new BadRequestException('Cannot book past dates');
     }
+
+
+    const clinicStatus = await this.clinicHolidayService.isHoliday(date);
+
+    if (clinicStatus.isFullDay) {
+      return { slots: [], reason: SlotUnavailableReason.CLINIC_HOLIDAY };
+    }
+    const clinicClosureWindows = clinicStatus.partialWindows;
 
     // 1️⃣ Override check - ensure date is in YYYY-MM-DD format
     console.log('Searching for override with doctorId:', doctorId, 'date:', date);
@@ -60,8 +71,7 @@ export class SlotService {
           bookedCountMap.set(key, (bookedCountMap.get(key) || 0) + 1);
         });
 
-
-      return await this.buildSlots({
+      let slots = await this.buildSlots({
         start: override.start_time,
         end: override.end_time,
         doctorId,
@@ -72,6 +82,22 @@ export class SlotService {
         bookedSet,
         bookedCountMap,
       });
+      slots = this.filterClinicClosureSlots(slots, clinicClosureWindows);
+
+      console.log('Final slots after applying clinic closures:', slots);
+
+      // return await this.buildSlots({
+      //   start: override.start_time,
+      //   end: override.end_time,
+      //   doctorId,
+      //   date,
+      //   interval: override.slot_duration,
+      //   scheduleType: override.schedule_type, // override usually behaves like stream
+      //   maxAppts: override.max_appts_per_slot,
+      //   bookedSet,
+      //   bookedCountMap,
+      // });
+      return slots;
     }
 
     // 2️⃣ Get recurring availability
@@ -111,7 +137,7 @@ export class SlotService {
       if (item.start_time === item.end_time) {
         throw new BadRequestException("Invalid time range: start_time and end_time must be different");
       }
-      const slots = await this.buildSlots({
+      let slots = await this.buildSlots({
         start: item.start_time,
         end: item.end_time,
         doctorId,
@@ -122,6 +148,8 @@ export class SlotService {
         bookedSet,
         bookedCountMap,
       });
+
+      slots = this.filterClinicClosureSlots(slots, clinicClosureWindows);
 
       allSlots.push(...slots);
     }
@@ -199,25 +227,27 @@ export class SlotService {
       const nextDateStr = nextdate.toISOString().slice(0, 10);
 
       // Get slots for that day
-      const slots = await this.getSlotsForDate(doctorId, nextDateStr);
+      const slotsResult = await this.getSlotsForDate(doctorId, nextDateStr);
 
-       if (slots.length > 0) {
-      const tokenCount = await this.bookingRepo.count({
-        where: {
-          doctor_id: doctorId,
+      // Check if slots are available (array) or unavailable (object with reason)
+      if (Array.isArray(slotsResult) && slotsResult.length > 0) {
+        const tokenCount = await this.bookingRepo.count({
+          where: {
+            doctor_id: doctorId,
+            date: nextDateStr,
+            status: 'BOOKED',
+          },
+        });
+
+        return {
           date: nextDateStr,
-          status: 'BOOKED',
-        },
-      });
+          slots: slotsResult,
+          token_no: tokenCount + 1,
+        };
+      }
+    }
 
-      return {
-        date: nextDateStr,
-        slots,
-        token_no: tokenCount + 1,
-      };
-    }
-    }
-    return{message: "No upcoming Doctor availability in next " + maxDays + " days"}; // No availability in the next maxDays
+    return { message: `No upcoming Doctor availability in next ${maxDays} days` };
   }
 
 
@@ -236,6 +266,21 @@ export class SlotService {
     return days[jsDay];
   }
 
+  private filterClinicClosureSlots(
+    slots: { start: string; end: string }[],
+    closureWindows: { start: string; end: string }[],
+  ): { start: string; end: string }[] {
+    if (!closureWindows || closureWindows.length === 0) return slots;
+
+    return slots.filter((slot) => {
+      // remove slot if it overlaps ANY closure window
+      const overlaps = closureWindows.some(
+        (window) =>
+          slot.start < window.end && slot.end > window.start
+      );
+      return !overlaps;
+    });
+  }
 
 
 }

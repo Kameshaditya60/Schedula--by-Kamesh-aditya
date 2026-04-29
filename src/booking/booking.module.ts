@@ -4,7 +4,6 @@ import { Booking } from "./booking.entity";
 import { BookingService } from "./booking.service";
 import { BookingController } from "./booking.controller";
 import { SlotModule } from "../slots/slot.module";
-import { SlotService } from "src/slots/slot.service";
 import { RecurringAvailability } from "src/availability/entity/recurring-availability.entity";
 import { AvailabilityOverride } from "src/availability/entity/availability-override.entity";
 
@@ -13,7 +12,7 @@ import { AvailabilityOverride } from "src/availability/entity/availability-overr
         TypeOrmModule.forFeature([Booking, RecurringAvailability, AvailabilityOverride]),
         SlotModule,
     ],
-    providers: [BookingService, SlotService],
+    providers: [BookingService],
     controllers: [BookingController],
 })
 export class BookingModule { }
