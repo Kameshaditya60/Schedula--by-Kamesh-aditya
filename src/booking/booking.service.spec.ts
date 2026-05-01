@@ -15,11 +15,15 @@ import { ClinicHoliday } from '../clinic-holiday/entity/clinic-holiday.entity';
 import { SlotService } from '../slots/slot.service';
 import { ScheduleType } from '../availability/enums/schedule-type.enum';
 import { SlotUnavailableReason } from '../slots/enums/slot-unavailable-reason.enum';
+import { todayStr, addDaysStr } from '../common/utils/date-time.util';
 
 const PATIENT_ID = 'pat-1';
 const DOCTOR_ID = 'doc-1';
-const FUTURE_MONDAY = '2099-01-05';
-const FUTURE_TUESDAY = '2099-01-06';
+// Use dates within the 7-day booking window (today..today+6).
+const IN_WINDOW_DAY_1 = addDaysStr(todayStr(), 1);
+const IN_WINDOW_DAY_2 = addDaysStr(todayStr(), 2);
+const FUTURE_MONDAY = IN_WINDOW_DAY_1;
+const FUTURE_TUESDAY = IN_WINDOW_DAY_2;
 
 const mockRepo = () => ({
   find: jest.fn(),
@@ -286,6 +290,8 @@ describe('BookingService', () => {
         id: 'b1',
         patient_id: PATIENT_ID,
         status: 'BOOKED',
+        date: addDaysStr(todayStr(), 2),
+        start_time: '09:00',
       });
       bookingRepo.save.mockImplementation(async (b) => b);
 
@@ -299,6 +305,8 @@ describe('BookingService', () => {
         id: 'b1',
         patient_id: 'other-patient',
         status: 'BOOKED',
+        date: addDaysStr(todayStr(), 2),
+        start_time: '09:00',
       });
 
       await expect(service.cancelBooking('b1', PATIENT_ID)).rejects.toThrow(ForbiddenException);
@@ -310,6 +318,123 @@ describe('BookingService', () => {
       await expect(service.cancelBooking('missing', PATIENT_ID)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('C4: rejects cancelling an already-CANCELLED booking', async () => {
+      bookingRepo.findOne.mockResolvedValue({
+        id: 'b1',
+        patient_id: PATIENT_ID,
+        status: 'CANCELLED',
+        date: addDaysStr(todayStr(), 2),
+        start_time: '09:00',
+      });
+
+      await expect(service.cancelBooking('b1', PATIENT_ID)).rejects.toThrow(
+        /already cancelled/i,
+      );
+    });
+
+    it('C5: rejects cancelling a past appointment', async () => {
+      bookingRepo.findOne.mockResolvedValue({
+        id: 'b1',
+        patient_id: PATIENT_ID,
+        status: 'BOOKED',
+        date: addDaysStr(todayStr(), -1),
+        start_time: '09:00',
+      });
+
+      await expect(service.cancelBooking('b1', PATIENT_ID)).rejects.toThrow(
+        /past appointment/i,
+      );
+    });
+
+    it('C6: rejects cancelling within 1 hour of appointment start', async () => {
+      // appointment starts ~30 minutes from now
+      const start = new Date(Date.now() + 30 * 60 * 1000);
+      const date = start.toISOString().slice(0, 10);
+      const start_time = start.toISOString().slice(11, 16); // HH:mm UTC
+
+      bookingRepo.findOne.mockResolvedValue({
+        id: 'b1',
+        patient_id: PATIENT_ID,
+        status: 'BOOKED',
+        date,
+        start_time,
+      });
+
+      await expect(service.cancelBooking('b1', PATIENT_ID)).rejects.toThrow(
+        /at least 1 hour/i,
+      );
+    });
+  });
+
+  // ----- 7-day booking window -----
+
+  describe('7-day booking window', () => {
+    const setupHappyPathMocks = () => {
+      bookingRepo.findOne.mockResolvedValue(null);
+      slotService.getSlotsForDate.mockResolvedValue({
+        slots: [{ start: '09:00', end: '09:30' }],
+      });
+      overrideRepo.findOne.mockResolvedValue(null);
+      availabilityRepo.findOne.mockResolvedValue(streamRecurring());
+      bookingRepo.count.mockResolvedValue(0);
+    };
+
+    it('W1: rejects booking earlier than today', async () => {
+      const yesterday = addDaysStr(todayStr(), -1);
+
+      await expect(
+        service.createBooking(PATIENT_ID, {
+          doctor_id: DOCTOR_ID,
+          date: yesterday,
+        } as any),
+      ).rejects.toThrow(/within the next 7 days/i);
+    });
+
+    it('W2: rejects booking beyond today+6 (8th day out)', async () => {
+      const day8 = addDaysStr(todayStr(), 7);
+
+      await expect(
+        service.createBooking(PATIENT_ID, {
+          doctor_id: DOCTOR_ID,
+          date: day8,
+        } as any),
+      ).rejects.toThrow(/within the next 7 days/i);
+    });
+
+    it('W3: accepts booking exactly at today (lower bound)', async () => {
+      setupHappyPathMocks();
+
+      const res = await service.createBooking(PATIENT_ID, {
+        doctor_id: DOCTOR_ID,
+        date: todayStr(),
+      } as any);
+
+      expect(res.message).toBe('Booking created successfully');
+    });
+
+    it('W4: accepts booking exactly at today+6 (upper bound)', async () => {
+      setupHappyPathMocks();
+
+      const res = await service.createBooking(PATIENT_ID, {
+        doctor_id: DOCTOR_ID,
+        date: addDaysStr(todayStr(), 6),
+      } as any);
+
+      expect(res.message).toBe('Booking created successfully');
+    });
+
+    it('W5: error message includes the maxDate (today+6)', async () => {
+      const day8 = addDaysStr(todayStr(), 7);
+      const expectedMax = addDaysStr(todayStr(), 6);
+
+      await expect(
+        service.createBooking(PATIENT_ID, {
+          doctor_id: DOCTOR_ID,
+          date: day8,
+        } as any),
+      ).rejects.toThrow(new RegExp(`today through ${expectedMax}`));
     });
   });
 });

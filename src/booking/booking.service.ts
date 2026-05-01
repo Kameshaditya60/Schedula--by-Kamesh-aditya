@@ -17,6 +17,12 @@ import { AvailabilityOverride } from 'src/availability/entity/availability-overr
 import { ScheduleType } from 'src/availability/enums/schedule-type.enum';
 import { SlotUnavailableReason } from 'src/slots/enums/slot-unavailable-reason.enum';
 import { ClinicHoliday } from 'src/clinic-holiday/entity/clinic-holiday.entity';
+import {
+  todayStr,
+  addDaysStr,
+  combineDateTime,
+  minutesUntil,
+} from '../common/utils/date-time.util';
 
 @Injectable()
 export class BookingService {
@@ -41,6 +47,14 @@ export class BookingService {
   async createBooking(patientId: string, dto: CreateBookingDto) {
     try {
       const { doctor_id, date } = dto;
+
+      const today = todayStr();
+      const maxDate = addDaysStr(today, 6);
+      if (date < today || date > maxDate) {
+        throw new BadRequestException(
+          `Appointments can only be booked within the next 7 days (today through ${maxDate}).`,
+        );
+      }
 
       // 1. Check duplicate booking for same patient + doctor + date
       const existingBooking = await this.repo.findOne({
@@ -236,6 +250,20 @@ export class BookingService {
 
     if (booking.patient_id !== patientId) {
       throw new ForbiddenException('Not your booking');
+    }
+
+    if (booking.status === 'CANCELLED') {
+      throw new BadRequestException('Booking is already cancelled');
+    }
+
+    const apptStart = combineDateTime(booking.date, booking.start_time);
+    if (apptStart.getTime() <= Date.now()) {
+      throw new BadRequestException('Cannot cancel a past appointment');
+    }
+    if (minutesUntil(apptStart) < 60) {
+      throw new BadRequestException(
+        'Cancellations must be made at least 1 hour before the appointment',
+      );
     }
 
     booking.status = 'CANCELLED';

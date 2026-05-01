@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { RecurringAvailability } from './entity/recurring-availability.entity';
 import { CreateRecurringAvailabilityDto } from './dto/recurring-availability.dto';
 import { AvailabilityOverride } from './entity/availability-override.entity';
@@ -20,7 +20,10 @@ export class RecurringAvailabilityService {
         private readonly overrideRepo: Repository<AvailabilityOverride>,
 
         @InjectRepository(Booking)
-        private readonly bookingRepo: Repository<Booking>
+        private readonly bookingRepo: Repository<Booking>,
+
+        @InjectDataSource()
+        private readonly dataSource: DataSource,
     ) { }
 
     async create(dto: CreateRecurringAvailabilityDto, user_id: string) {
@@ -170,31 +173,42 @@ export class RecurringAvailabilityService {
                 throw new BadRequestException('start_time must be earlier than end_time');
             }
         }
-        const existing = await this.overrideRepo.find({
-            where: { doctor_id: user_id, date: dto.date },
+
+        return this.dataSource.transaction(async (manager) => {
+            const overrideRepo = manager.getRepository(AvailabilityOverride);
+            const bookingRepo = manager.getRepository(Booking);
+
+            await overrideRepo.delete({ doctor_id: user_id, date: dto.date });
+
+            const saved = await overrideRepo.save(
+                overrideRepo.create({
+                    doctor_id: user_id,
+                    date: dto.date,
+                    start_time: dto.start_time || null,
+                    end_time: dto.end_time || null,
+                    slot_duration: dto.slot_duration || null,
+                    session_type: dto.session_type || null,
+                    schedule_type: dto.schedule_type || null,
+                    max_appts_per_slot: dto.max_appts_per_slot || null,
+                    is_unavailable: dto.is_unavailable,
+                }),
+            );
+
+            let cancelledBookings = 0;
+            if (dto.is_unavailable === true) {
+                const result = await bookingRepo
+                    .createQueryBuilder()
+                    .update(Booking)
+                    .set({ status: 'CANCELLED' })
+                    .where('doctor_id = :doctor_id', { doctor_id: user_id })
+                    .andWhere('date = :date', { date: dto.date })
+                    .andWhere('status = :status', { status: 'BOOKED' })
+                    .execute();
+                cancelledBookings = result.affected ?? 0;
+            }
+
+            return { override: saved, cancelledBookings };
         });
-
-        // If overrides already exist for this date, update them by deleting and recreating
-        if (existing && existing.length > 0) {
-            await this.overrideRepo.delete({
-                doctor_id: user_id,
-                date: dto.date,
-            });
-        }
-
-        const override = this.overrideRepo.create({
-            doctor_id: user_id,
-            date: dto.date,
-            start_time: dto.start_time || null,
-            end_time: dto.end_time || null,
-            slot_duration: dto.slot_duration || null,
-            session_type: dto.session_type || null,
-            schedule_type: dto.schedule_type || null,
-            max_appts_per_slot: dto.max_appts_per_slot || null,
-            is_unavailable: dto.is_unavailable,
-        });
-
-        return this.overrideRepo.save(override);
     }
 
     private getDayOfWeek(date: string): DayOfWeek {
