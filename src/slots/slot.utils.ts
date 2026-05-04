@@ -55,3 +55,25 @@ export function generateTimeSlots(
 
   return slots;
 }
+
+import { SlotUnavailableReason } from './enums/slot-unavailable-reason.enum';
+
+export function getUnavailableMessage(
+  reason: SlotUnavailableReason,
+  date: string,
+): string {
+  switch (reason) {
+    case SlotUnavailableReason.CLINIC_HOLIDAY:
+      return `Clinic is closed on ${date}`;
+    case SlotUnavailableReason.DOCTOR_ON_LEAVE:
+      return `Doctor is unavailable on ${date}`;
+    case SlotUnavailableReason.NO_SCHEDULE:
+      return `Doctor has no schedule on ${date}`;
+    case SlotUnavailableReason.ALL_SLOTS_BOOKED:
+      return `All appointments are fully booked on ${date}`;
+    case SlotUnavailableReason.CONSULTING_HOURS_OVER:
+      return `Consulting hours are over for ${date}`;
+    default:
+      return `No slots available on ${date}`;
+  }
+}

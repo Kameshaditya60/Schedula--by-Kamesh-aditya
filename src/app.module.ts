@@ -10,6 +10,7 @@ import { PatientProfileModule } from './patientProfile/patient-profile.module';
 import { RecurringAvailabilityModule } from './availability/recurring-availability.module';
 import { SlotModule } from './slots/slot.module';
 import { BookingModule } from './booking/booking.module';
+import { ClinicHolidayModule } from './clinic-holiday/clinic-holiday.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { BookingModule } from './booking/booking.module';
     RecurringAvailabilityModule,
     SlotModule,
     BookingModule,
+    ClinicHolidayModule,
     AuthModule,
   ],
   controllers: [AppController],

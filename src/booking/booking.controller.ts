@@ -44,9 +44,10 @@ export class BookingController {
   @Roles(Role.PATIENT)
   @Get('my')
   getMyBookings(
-    @Request() req )
-     {
-    return this.service.getPatientBookings(req.user.user_id);
+    @Query('date') date: string,
+    @Request() req
+  ) {
+    return this.service.getPatientBookings(req.user.user_id, date);
   }
 
 
@@ -54,6 +55,7 @@ export class BookingController {
   @Get('doctor')
   getDoctorSchedule(
     @Query('doctor_id') doctorId: string,
+    @Query('patient_id') patientId: string,
     @Query('date') date: string,
   ) {
     return this.service.getDoctorSchedule(doctorId, date);
