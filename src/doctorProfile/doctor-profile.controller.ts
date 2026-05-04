@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { DoctorProfileService } from './doctor-profile.service';
 import { CreateDoctorProfileDto } from './dto/doctor-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt.guard';
@@ -30,5 +30,11 @@ export class DoctorController {
             throw new BadRequestException('Search must be at least 2 characters');
         }
         return this.doctorService.findAll({ specialization, search });
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/address')
+    async getDoctorAddress(@Param('id') id: string) {
+        return this.doctorService.findAddressById(id);
     }
 }
