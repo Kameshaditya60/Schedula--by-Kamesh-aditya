@@ -271,10 +271,12 @@ export class BookingService {
   }
 
 
-  async getPatientBookings(patientId: string) {
+  async getPatientBookings(patientId: string, date?: string) {
     return this.repo.find({
-      where: { patient_id: patientId },
-      order: { date: 'DESC' },
+      where: date
+        ? { patient_id: patientId, date }
+        : { patient_id: patientId },
+      order: { date: 'DESC', start_time: 'ASC' },
     });
   }
 
