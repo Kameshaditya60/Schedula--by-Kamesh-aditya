@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DoctorProfile } from './doctor-profile.entity';
@@ -63,6 +63,39 @@ export class DoctorProfileService {
     }
 
 
+    async findAddressById(doctor_id: string) {
+        const profile = await this.repo.findOne({
+            where: { doctor_id },
+            relations: ['user'],
+            select: {
+                doctor_id: true,
+                clinic_name: true,
+                street: true,
+                city: true,
+                state: true,
+                zip: true,
+                country: true,
+                user: { name: true },
+            },
+        });
+
+        if (!profile) {
+            throw new NotFoundException(`Doctor not found: ${doctor_id}`);
+        }
+
+        return {
+            doctor_id: profile.doctor_id,
+            name: profile.user?.name,
+            clinic_name: profile.clinic_name,
+            address: {
+                street: profile.street,
+                city: profile.city,
+                state: profile.state,
+                zip: profile.zip,
+                country: profile.country,
+            },
+        };
+    }
 }
 
 

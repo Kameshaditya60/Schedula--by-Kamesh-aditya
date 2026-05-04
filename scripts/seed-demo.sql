@@ -97,16 +97,28 @@ VALUES ('22222222-2222-2222-2222-222222222222',
         NULL);
 
 INSERT INTO doctor_profile
-  (doctor_id, specialization, years_experience, qualifications, clinic_name, address)
+  (doctor_id, specialization, years_experience, qualifications,
+   clinic_name, street, city, state, zip, country)
 VALUES ('22222222-2222-2222-2222-222222222222',
         'General Medicine',
         1,
         'MBBS',
-        NULL,
-        NULL);
+        NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- Intentionally NO recurring_availability and NO availability_override rows.
 -- Every day in the next 30 days will resolve to reason = NO_SCHEDULE.
+
+-- ============================================================================
+-- 6. Address for the main demo doctor (used by GET /doctors/:id/address)
+-- ============================================================================
+UPDATE doctor_profile
+SET clinic_name = 'Apollo Clinic',
+    street      = '12 MG Road, Indiranagar',
+    city        = 'Bangalore',
+    state       = 'Karnataka',
+    zip         = '560038',
+    country     = 'India'
+WHERE doctor_id = 'ae5d4932-133f-488a-be79-31775be8e8cd';
 
 COMMIT;
 

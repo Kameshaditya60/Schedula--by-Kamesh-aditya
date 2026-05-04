@@ -3,5 +3,9 @@ export class CreateDoctorProfileDto {
   years_experience: number;
   qualifications: string;
   clinic_name?: string;
-  address?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
 }
